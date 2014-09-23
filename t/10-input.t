@@ -2,6 +2,7 @@ use strict;
 use Test::More;
 
 use Data::BEACON::Parser;
+use IO::File;
 
 my $beacon = do { local (@ARGV, $/) = "t/input.txt"; <> };
 my $link   = [qw(source target annotation)];
@@ -9,7 +10,7 @@ my $link   = [qw(source target annotation)];
 {   
     open my $stdin, '<', \$beacon;
     local *STDIN = $stdin;
-    is_deeply [ Data::BEACON::Parser->new->next_link ], $link, 'STDIN (default)';
+    is_deeply(Data::BEACON::Parser->new->next_link, $link, 'STDIN (default)');
 }
 
 my @input = (
@@ -20,7 +21,7 @@ my @input = (
 );
 
 for(my $i=0; $i<@input; $i+=2) {
-    is_deeply [ Data::BEACON::Parser->new($input[$i+1])->next_link ], $link, $input[$i];
+    is_deeply(Data::BEACON::Parser->new($input[$i+1])->next_link, $link, $input[$i]);
 }
 
 foreach ( (bless {}, 'DoesNotExist'), [], '' ) {

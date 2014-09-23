@@ -43,6 +43,39 @@ sub getline {
     return $line;
 }
 
+sub meta {
+    my $self = shift;
+
+    if (@_) {
+        my $field = shift;
+
+        if (@_) {
+            my $value = shift;
+            
+            $value =~ s/[ \t\r\n]+/ /;
+            $value =~ s/^ | $//g;
+
+            if ($field eq 'PREFIX' or $field eq 'TARGET') {
+                # TODO
+                if ($value eq '{+ID}') {
+                    $value = undef; # default value
+                } else {
+                    if ($value !~ /{\+?ID}/) {
+                        $value .= '{ID}';
+                    }
+                    $value = URI::Template->new($value);
+                }
+            } # TODO: validate and normalize other fields too
+
+            $self->{meta}->{$field} = $value;
+        }
+
+        return $self->{meta}->{$field};
+    } else {
+        return { map { $_ => $self->{meta}->{$_} } keys %{$self->{meta}} };
+    }
+}
+
 sub next {
     my ($self) = @_;
 
@@ -58,14 +91,7 @@ sub next {
             if ($line =~ $EMPTY_LINE) {
                 last;
             } elsif ($line =~ /^#([A-Z]+)(:|[ \t])[ \t]*(.*)$/) {
-                my ($field, $value) = ($1, $3);
-
-                $value =~ s/[ \t]+/ /; # normalize space
-                $value =~ s/ +$//;
-
-                # TODO: validate/compile meta fields
-                $self->{meta}->{field} = $value;
-
+                $self->meta($1,$3);
             } else {
                 if ($line =~ /^#/) {
                     # TODO: first link line MUST NOT begin with "#"
@@ -85,7 +111,7 @@ sub next {
             
             # TODO: warn if (scalar @link > 3 )
 
-            if (defined $link[1] and $link[1] =~ /^https?:/ and $self->meta->{TARGET} eq '{+ID}') {
+            if (defined $link[1] and $link[1] =~ /^https?:/ and !defined $self->{meta}->{TARGET}) {
                 return [ $link[0], undef, $link[1] ]
             } else {
                 return [ $link[0], $link[1], $link[2] ];
@@ -94,6 +120,7 @@ sub next {
         $line = $self->getline // return;
     } 
     
+    return;
 }
 
 # 3.1 Link construction
@@ -102,10 +129,10 @@ sub link {
 
     $target //= $source;
 
-    my $source_template = $self->{PREFIX} // $DEFAULT_TEMPLATE;
-    my $target_template = $self->{TARGET} // $DEFAULT_TEMPLATE;
+    my $source_template = $self->meta('PREFIX') // $DEFAULT_TEMPLATE;
+    my $target_template = $self->meta('TARGET') // $DEFAULT_TEMPLATE;
 
-    return (
+     return (
         $source_template->process_to_string( ID => $source ),
         $target_template->process_to_string( ID => $target ),
         $annotation // $self->{meta}->{MESSAGE}
@@ -115,7 +142,16 @@ sub link {
 sub next_link {
     my ($self) = @_;
     my $next = $self->next // return;
-    $self->link( @$next );
+    [ $self->link( @$next ) ]
+}
+
+sub all_links {
+    my ($self) = @_;
+    my $links = [];
+    while (my $link = $self->next_link) {
+        push @$links, $link;
+    }
+    return $links;
 }
 
 1;
@@ -155,6 +191,10 @@ source identifier, target identifier, and annotation.
 
 =head2 next_link
 
-Read the next link line and construct a link.
+Read the next link line, construct a link, and return it as array reference.
+
+=head2 all_links
+
+Read and construct all links and return it as array reference.
 
 =cut
