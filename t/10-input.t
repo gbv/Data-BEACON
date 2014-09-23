@@ -3,31 +3,29 @@ use Test::More;
 
 use Data::BEACON::Parser;
 
-my $beacon = "source|annotation|target";
+my $beacon = do { local (@ARGV, $/) = "t/input.txt"; <> };
+my $link   = [qw(source target annotation)];
 
-my %input = (
+{   
+    open my $stdin, '<', \$beacon;
+    local *STDIN = $stdin;
+    is_deeply [ Data::BEACON::Parser->new->next_link ], $link, 'STDIN (default)';
+}
 
-    'string referene' =>
-        [ Data::BEACON::Parser->new(\$beacon)->next_link ],
-
-    'STDIN (default)' => do {   
-        open my $stdin, '<', \$beacon;
-        local *STDIN = $stdin;
-        [ Data::BEACON::Parser->new->next_link ];
-    },
-
-    # input from object with 'getline' method (e.g. IO::Handle)
-    # ...
-
-    # input from handle
-    # ...
-
-    # input from file
-    # ...
+my @input = (
+    'string referene' => \$beacon,
+    'object with getline method' => IO::File->new('t/input.txt','r'),
+    'file' => 't/input.txt',
+    'handle' => do { open my $fh, '<', 't/input.txt'; $fh },
 );
 
-while (my ($msg, $first) = each %input) {
-    is_deeply $first, [qw(source target annotation)], $msg;
+for(my $i=0; $i<@input; $i+=2) {
+    is_deeply [ Data::BEACON::Parser->new($input[$i+1])->next_link ], $link, $input[$i];
+}
+
+foreach ( (bless {}, 'DoesNotExist'), [], '' ) {
+    eval { Data::BEACON::Parser->new($_) };
+    ok $@, 'invalid input';
 }
 
 done_testing;

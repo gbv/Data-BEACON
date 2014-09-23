@@ -18,8 +18,7 @@ sub new {
 
     unless (defined eval { fileno $input }) {
         if ((ref $input and ref $input eq 'SCALAR') or -e $input) {
-            my $fh;
-            open($fh, '<:encoding(UTF-8)', $input)
+            open(my $fh, '<:encoding(UTF-8)', $input)
                 or croak "cannot read from file $input";
             $input = $fh;
         } elsif (blessed $input) {
@@ -87,9 +86,9 @@ sub next {
             # TODO: warn if (scalar @link > 3 )
 
             if (defined $link[1] and $link[1] =~ /^https?:/ and $self->meta->{TARGET} eq '{+ID}') {
-                return ($link[0], undef, $link[1])
+                return [ $link[0], undef, $link[1] ]
             } else {
-                return ($link[0], $link[1], $link[2]);
+                return [ $link[0], $link[1], $link[2] ];
             }
         }
         $line = $self->getline // return;
@@ -115,9 +114,8 @@ sub link {
 
 sub next_link {
     my ($self) = @_;
-    my @next = $self->next;
-    return unless @next;
-    $self->link( @next );
+    my $next = $self->next // return;
+    $self->link( @$next );
 }
 
 1;
@@ -129,11 +127,26 @@ __END__
 
 Data::BEACON::Parser - BEACON text file format parser
 
+=head1 SYNOPSIS
+
+    use Data::BEACON::Parser;
+    my $parser = Data::BEACON::Parser->new('beacon.txt');
+
+    while( my $link = $parser->next_link ) {
+        ...
+    }
+
 =head1 METHODS
+
+=head2 new( [ $input ] )
+
+Create a new parser to parse from an input handle (STDIN by default), file,
+string reference, or any object with a getline method.
 
 =head2 next
 
-Read the next link line and return its tokens (source, annotation, and target).
+Read the next link line and return its tokens (source, annotation, and target)
+as array reference.
 
 =head2 link( $source, $annotation, $target )
 
